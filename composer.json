@@ -1,0 +1,28 @@
+{
+  "name": "grundell/websockets",
+  "version": "0.1.0",
+  "type": "library",
+
+  "description": "WebSocket implementation",
+  "keywords": ["websockets"],
+  "homepage": "https://github.com/stegru/php-websockets",
+
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Steve Grundell"
+    }
+  ],
+
+  "minimum-stability": "stable",
+
+  "require": {
+    "php": ">=5.4.0"
+  },
+
+  "autoload": {
+    "psr-4": {
+      "WebSock\\": "src/WebSockets"
+    }
+  }
+}
