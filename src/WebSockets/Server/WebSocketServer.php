@@ -23,12 +23,18 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
     private $streams;
     /** @var ClientConnection[] */
     private $connections = [];
+    /** @var int The address to listen on. */
+    private $bindAddress;
 
     /**
      * Initialises the WebSocketServer class.
+     *
+     * @param $bindAddress string The IP:port or just the port to listen on.
      */
-    public function __construct()
+    public function __construct($bindAddress = "0.0.0.0:8088")
     {
+        $this->bindAddress = is_numeric($bindAddress) ? "0.0.0.0:$bindAddress" : $bindAddress;
+
         $this->streams = new SocketReader($this);
     }
 
@@ -52,7 +58,7 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
      * @param int $timeout Number of seconds to wait for something. NULL to wait forever.
      * @return bool TRUE on timeout, FALSE on error.
      */
-    public function pump($timeout = 10)
+    public function pump($timeout = 30)
     {
         return $this->streams->listen($timeout);
     }
@@ -62,7 +68,7 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
      */
     private function createListener()
     {
-        $listen = stream_socket_server("tcp://127.0.0.1:8088");
+        $listen = stream_socket_server("tcp://$this->bindAddress");
         $this->streams->addStream($listen, 'listener');
     }
 
@@ -125,7 +131,6 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
     private function performHandshake(HttpRequest $req)
     {
         $response = new HttpResponse();
-
         $requestLine = $req->getRequestLine();
 
         if (preg_match(',^GET /[^ ]* HTTP/1.1$,', $requestLine) !== 1) {
@@ -143,7 +148,7 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
         } else if (($key = $req->getHeader("Sec-WebSocket-Key")) === NULL) {
             $response->setStatus("400 Unrecognised Sec-WebSocket-Key");
 
-        } else if (($protocol = $req->getHeader("Sec-WebSocket-Protocol")) !== "hello") {
+        } else if (($protocol = $req->getHeader("Sec-WebSocket-Protocol")) === NULL) {
             $response->setStatus("400 Unrecognised Sec-WebSocket-Protocol");
 
         } else {
