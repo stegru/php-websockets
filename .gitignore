@@ -1,6 +1,8 @@
 composer.phar
 vendor/
 composer.lock
+tests/
+test.php
 
 .vagrant/
 
