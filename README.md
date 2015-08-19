@@ -46,5 +46,5 @@ ws.send("hello!");
 Output:
 ```
 Welcome!
-!olleH
+!olleh
 ```
