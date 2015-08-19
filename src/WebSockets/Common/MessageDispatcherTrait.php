@@ -10,15 +10,15 @@ namespace WebSockets\Common;
  */
 trait MessageDispatcherTrait
 {
-    /** @var MessageListenerInterface[] */
+    /** @var MessageListenerInterface[]|callable[] */
     private $messageListeners = [];
 
     /**
      * Adds a message listener to the subscribed list.
      *
-     * @param MessageListenerInterface $listener
+     * @param MessageListenerInterface|callable $listener
      */
-    public function addMessageListener(MessageListenerInterface $listener)
+    public function addMessageListener($listener)
     {
         $this->messageListeners[] = $listener;
     }
@@ -26,9 +26,9 @@ trait MessageDispatcherTrait
     /**
      * Un-subscribe a message listener.
      *
-     * @param MessageListenerInterface $listener
+     * @param MessageListenerInterface|callable $listener
      */
-    public function removeMessageListener(MessageListenerInterface $listener)
+    public function removeMessageListener($listener)
     {
         $key = array_search($listener, $this->messageListeners, FALSE);
         if ($key !== FALSE) {
@@ -45,7 +45,11 @@ trait MessageDispatcherTrait
     public function notifyMessageListeners(Connection $connection, $message = NULL)
     {
         foreach ($this->messageListeners as $listener) {
-            $listener->gotMessage($connection, $message);
+            if ($listener instanceof MessageListenerInterface) {
+                $listener->gotMessage($connection, $message);
+            } else if (is_callable($listener)) {
+                $listener($connection, $message);
+            }
         }
     }
 }
