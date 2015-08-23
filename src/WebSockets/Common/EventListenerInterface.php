@@ -8,14 +8,13 @@ namespace WebSockets\Common;
  *
  * @package WebSockets\Server
  */
-interface MessageListenerInterface
+interface EventListenerInterface
 {
     /**
      * Called when a message has been received, or a client has connected/disconnected.
      *
-     * @param Connection $connection The client connection.
-     * @param string $message The message text. NULL if the client has connected or disconnected.
+     * @param $event Event The event object.
      * @return mixed
      */
-    public function gotMessage(Connection $connection, $message);
+    public function gotEvent(Event $event);
 }

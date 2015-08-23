@@ -25,13 +25,23 @@ class SocketReader
     }
 
     /**
+     * Checks if a stream with the given ID exists.
+     * @param $id string The ID to check
+     * @return bool TRUE if there's a stream with the given ID.
+     */
+    private function idExists($id)
+    {
+        return array_key_exists($id, $this->streams);
+    }
+
+    /**
      * Generates an ID.
      *
      * @return int
      */
     private function generateId()
     {
-        while (array_key_exists(++$this->lastId, $this->streams));
+        while ($this->idExists(++$this->lastId));
         return $this->lastId;
     }
 
@@ -45,6 +55,10 @@ class SocketReader
      */
     public function addStream($stream, $id = NULL, StreamListenerInterface $eventListener = NULL)
     {
+        if ($this->idExists($id)) {
+            $id = NULL;
+        }
+
         if ($id === NULL) {
             $id = $this->generateId();
         }
@@ -85,18 +99,18 @@ class SocketReader
         }
 
         // See if it's an ID.
-        return array_key_exists($obj, $this->streams) ? $obj : FALSE;
+        return $this->idExists($obj) ? $obj : FALSE;
     }
 
     /**
      * Gets a stream.
      *
      * @param string $id
-     * @return resource
+     * @return resource NULL if no such ID.
      */
     public function getStream($id)
     {
-        return $this->streams[$id];
+        return $this->idExists($id) ? $this->streams[$id] : NULL;
     }
 
     /**
@@ -151,8 +165,6 @@ class SocketReader
                 }
             }
         }
-
-        echo "no more\n";
 
         return FALSE;
     }

@@ -9,7 +9,6 @@ namespace WebSockets\Common;
  *
  * @package WebSockets\Server
  */
-class BadFrameException extends \Exception
+class BadFrameException extends WebSocketException
 {
-
 }

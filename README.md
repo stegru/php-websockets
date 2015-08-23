@@ -8,35 +8,38 @@ Install:
 $ composer require stegru/websockets
 ```
 
-
+Simple example:
 ```php
 <?php
-// ws.php
+require_once('vendor/autoload.php');
 
-...
+use WebSockets\Common\Event;
+use WebSockets\Server\WebSocketServer;
 
-$wc = new WebSocketServer(8088);
+$ws = new WebSocketServer();
 
-$wc->addMessageListener(function($connection, $message) {
-    if ($message === NULL) {
-        if (!$connection->isClosed()) {
-            $connection->sendMessage("Welcome!");
-        }
-    } else {
-        $connection->sendMessage(strrev($message));
+$ws->addEventListener(function (Event $e) {
+
+    switch ($e->eventId) {
+        case WebSocketServer::EVENT_CONNECTED:
+            $e->connection->sendMessage("Welcome!");
+            break;
+
+        case WebSocketServer::EVENT_MESSAGE:
+            $e->connection->sendMessage(strrev($e->message));
+            break;
     }
 });
 
-$wc->start();
-
+$ws->start();
 ```
 
+Run:
 ```
 $ php ws.php 
 ```
 
 Browser:
-
 ```javascript
 var ws = new WebSocket("ws://localhost:8088/socketserver", "hello");
 ws.onmessage = function(e) { console.log(e.data); }

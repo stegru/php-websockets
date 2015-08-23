@@ -1,12 +1,7 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: ste
- * Date: 18/08/15
- * Time: 20:04
- */
 
 namespace WebSockets\Common;
+use WebSockets\Server\WebSocketServer;
 
 
 /**
@@ -16,7 +11,7 @@ namespace WebSockets\Common;
  */
 abstract class Connection
 {
-    use MessageDispatcherTrait;
+    use EventDispatcherTrait;
 
     /** @var resource */
     private $stream;
@@ -121,7 +116,9 @@ abstract class Connection
      */
     public function connectionClosed()
     {
-        $this->notifyMessageListeners($this, NULL);
+        $e = $this->createEvent(WebSocketServer::EVENT_DISCONNECTED);
+        $e->connection = $this;
+        $this->notifyEventListeners($e);
     }
 
     /**
@@ -139,7 +136,10 @@ abstract class Connection
      */
     private function gotMessage()
     {
-        $this->notifyMessageListeners($this, $this->message);
+        $e = $this->createEvent(WebSocketServer::EVENT_MESSAGE);
+        $e->connection = $this;
+        $e->message = $this->message;
+        $this->notifyEventListeners($e);
     }
 
     /**

@@ -1,10 +1,10 @@
 <?php
 
 namespace WebSockets\Server;
-use WebSockets\Common\Connection;
+use WebSockets\Common\Event;
 use WebSockets\Common\Frame;
-use WebSockets\Common\MessageDispatcherTrait;
-use WebSockets\Common\MessageListenerInterface;
+use WebSockets\Common\EventDispatcherTrait;
+use WebSockets\Common\EventListenerInterface;
 use WebSockets\Common\SocketReader;
 use WebSockets\Common\StreamListenerInterface;
 
@@ -15,9 +15,14 @@ use WebSockets\Common\StreamListenerInterface;
  *
  * @package WebSockets\Server
  */
-class WebSocketServer implements StreamListenerInterface, MessageListenerInterface
+class WebSocketServer implements StreamListenerInterface, EventListenerInterface
 {
-    use MessageDispatcherTrait;
+    use EventDispatcherTrait;
+
+    const EVENT_MESSAGE = 'message';
+    const EVENT_HANDSHAKE = 'handshake';
+    const EVENT_CONNECTED = 'connected';
+    const EVENT_DISCONNECTED = 'disconnected';
 
     /** @var SocketReader */
     private $streams;
@@ -103,9 +108,7 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
         $this->streams->removeStream($streamId);
 
         if ($success) {
-            $response = $this->performHandshake($req);
-            $success = substr($response->getStatus(), 0, 3) === "101";
-            fwrite($stream, $response);
+            $success = $this->performHandshake($req);
         }
 
         if (!$success) {
@@ -117,55 +120,37 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
         $streamId = $this->streams->addStream($stream, $streamId, $this);
 
         $connection = new ClientConnection($stream, $streamId);
-        $connection->addMessageListener($this);
+        $connection->addEventListener($this);
         $this->connections[$streamId] = $connection;
-        $this->notifyMessageListeners($connection, NULL);
+
+        $e = $this->createEvent(WebSocketServer::EVENT_CONNECTED);
+        $e->connection = $connection;
+        $this->notifyEventListeners($e);
     }
 
     /**
      * Performs the WebSocket HTTP hand-shake.
      *
-     * @param HttpRequest $req The complete HTTP request.
+     * @param HttpRequest $httpRequest
      * @return HttpResponse The HTTP response to send back to the browser.
      */
-    private function performHandshake(HttpRequest $req)
+    private function performHandshake(HttpRequest $httpRequest)
     {
-        $response = new HttpResponse();
-        $requestLine = $req->getRequestLine();
+        $req = new WebSocketRequest($httpRequest);
 
-        if (preg_match(',^GET /[^ ]* HTTP/1.1$,', $requestLine) !== 1) {
-            $response->setStatus("400 Bad Request");
+        if ($req->validate()) {
+            $e = $this->createEvent(WebSocketServer::EVENT_HANDSHAKE);
+            $e->request = $req;
+            $this->notifyEventListeners($e);
 
-        } else if (stristr($req->getHeader("Upgrade"), "websocket") === FALSE) {
-            $response->setStatus("400 Unrecognised Upgrade header");
-
-        } else if (stristr($req->getHeader("Connection"), "Upgrade") === FALSE) {
-            $response->setStatus("400 Unrecognised Connection header");
-
-        } else if ($req->getHeader("Sec-WebSocket-Version") !== "13") {
-            $response->setStatus("400 Unrecognised Sec-WebSocket-Version header");
-
-        } else if (($key = $req->getHeader("Sec-WebSocket-Key")) === NULL) {
-            $response->setStatus("400 Unrecognised Sec-WebSocket-Key");
-
-        } else if (($protocol = $req->getHeader("Sec-WebSocket-Protocol")) === NULL) {
-            $response->setStatus("400 Unrecognised Sec-WebSocket-Protocol");
-
-        } else {
-
-            $clientKey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-            $hash = base64_encode(sha1("$key$clientKey", true));
-
-            $response->setStatus("101 Switching Protocols");
-            $response->addHeaders([
-                "Upgrade" => "websocket",
-                "Connection" => "Upgrade",
-                "Sec-WebSocket-Accept" => $hash,
-                "Sec-WebSocket-Protocol" => $protocol
-            ]);
+            if (!$req->isRejected()) {
+                $req->handshake();
+            }
         }
 
-        return $response;
+        $success = !$req->isRejected() && substr($req->getHttpResponse()->getStatus(), 0, 3) === "101";
+        fwrite($httpRequest->getStream(), $req->getHttpResponse());
+        return $success;
     }
 
     /**
@@ -238,12 +223,11 @@ class WebSocketServer implements StreamListenerInterface, MessageListenerInterfa
     /**
      * Called when a message has been received, or a client has connected/disconnected.
      *
-     * @param Connection $clientConnection The client connection.
-     * @param string $message The message text. NULL if the client has connected or disconnected.
+     * @param Event $event
      * @return mixed
      */
-    public function gotMessage(Connection $clientConnection, $message)
+    public function gotEvent(Event $event)
     {
-        $this->notifyMessageListeners($clientConnection, $message);
+        $this->notifyEventListeners($event);
     }
 }

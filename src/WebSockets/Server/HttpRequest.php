@@ -37,6 +37,20 @@ class HttpRequest implements StreamListenerInterface
     }
 
     /**
+     * Creates a HttpRequest instance using the given string.
+     *
+     * @param string $requestBuffer The HTTP request.
+     * @return HttpRequest
+     */
+    public static function FromString($requestBuffer)
+    {
+        $req = new HttpRequest();
+        $req->requestBuffer = $requestBuffer;
+        $req->gotHeaders();
+        return $req;
+    }
+
+    /**
      * Called when all headers have been received.
      */
     private function gotHeaders()
