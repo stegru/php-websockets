@@ -20,6 +20,7 @@ class HttpRequest implements StreamListenerInterface
     private $stream;
     /** @var array The HTTP headers. */
     private $headers;
+    private $requestLine;
 
     /**
      * Creates a HttpRequest instance using the given stream.
@@ -65,9 +66,25 @@ class HttpRequest implements StreamListenerInterface
      * @return array
      */
     private function parseHeaders() {
-        $headers = http_parse_headers($this->requestBuffer);
+
+        $this->requestLine = preg_split("[\r\n]", $this->requestBuffer, 2)[0];
+
+        if (function_exists("http_parse_headers")) {
+            $headers = http_parse_headers($this->requestBuffer);
+        } else {
+            $this->_headers = [];
+
+            preg_replace_callback('/([^ :]*): *([^\r\n]+)[\r\n]+/', function ($s) {
+                $this->_headers[$s[1]] = $s[2];
+            }, $this->requestBuffer);
+
+            $headers = $this->_headers;
+        }
+
         return $headers;
     }
+
+    private $_headers;
 
     /**
      * Invoke the callback.
@@ -138,7 +155,7 @@ class HttpRequest implements StreamListenerInterface
      */
     public function getHeader($name)
     {
-        return isset($this->headers[$name]) ? $this->headers[$name] : NULL;
+        return array_key_exists($name, $this->headers) ? $this->headers[$name] : NULL;
     }
 
     /**
@@ -157,46 +174,7 @@ class HttpRequest implements StreamListenerInterface
      * @return mixed
      */
     public function getRequestLine() {
-        return $this->headers[0];
+        return $this->requestLine;
     }
 }
 
-
-if (!function_exists('http_parse_headers')) {
-
-    /**
-     * A PHP implementation of http_parse_headers, in case it is not available.
-     *
-     * @param $raw_headers
-     * @return array
-     */
-    function http_parse_headers($raw_headers) {
-        $headers = [];
-        $key = '';
-
-        foreach(explode("\n", $raw_headers) as $i => $h) {
-            $h = explode(':', $h, 2);
-
-            if (isset($h[1])) {
-                if (!isset($headers[$h[0]])) {
-                    $headers[$h[0]] = trim($h[1]);
-                } elseif (is_array($headers[$h[0]])) {
-                    $headers[$h[0]] = array_merge($headers[$h[0]], array(trim($h[1])));
-                } else {
-                    $headers[$h[0]] = array_merge(array($headers[$h[0]]), array(trim($h[1])));
-                }
-
-                $key = $h[0];
-            }
-            else {
-                if (substr($h[0], 0, 1) === "\t") {
-                    $headers[$key] .= "\r\n\t" . trim($h[0]);
-                } elseif (!$key) {
-                    $headers[0] = trim($h[0]);
-                }
-            }
-        }
-
-        return $headers;
-    }
-}

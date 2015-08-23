@@ -150,6 +150,7 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
 
         $success = !$req->isRejected() && substr($req->getHttpResponse()->getStatus(), 0, 3) === "101";
         fwrite($httpRequest->getStream(), $req->getHttpResponse());
+
         return $success;
     }
 
