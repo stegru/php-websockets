@@ -28,7 +28,7 @@ class WebSocketRequest
     public function __construct(HttpRequest $httpRequest, HttpResponse $httpResponse = NULL)
     {
         $this->httpRequest = $httpRequest;
-        $this->httpResponse = $httpResponse ? $httpResponse : new HttpResponse();
+        $this->httpResponse = $httpResponse ?: new HttpResponse();
     }
 
     /**

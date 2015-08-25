@@ -1,6 +1,7 @@
 <?php
 
 namespace WebSockets\Server;
+
 use WebSockets\Common\StreamListenerInterface;
 
 
@@ -65,26 +66,22 @@ class HttpRequest implements StreamListenerInterface
      *
      * @return array
      */
-    private function parseHeaders() {
+    private function parseHeaders()
+    {
+        $lines = preg_split("/\r?\n/", $this->requestBuffer, NULL, PREG_SPLIT_NO_EMPTY);
+        $this->requestLine = array_shift($lines);
 
-        $this->requestLine = preg_split("[\r\n]", $this->requestBuffer, 2)[0];
+        $headers = [];
 
-        if (function_exists("http_parse_headers")) {
-            $headers = http_parse_headers($this->requestBuffer);
-        } else {
-            $this->_headers = [];
-
-            preg_replace_callback('/([^ :]*): *([^\r\n]+)[\r\n]+/', function ($s) {
-                $this->_headers[$s[1]] = $s[2];
-            }, $this->requestBuffer);
-
-            $headers = $this->_headers;
+        foreach ($lines as $line) {
+            if (strlen($line) > 0) {
+                $split = explode(":", $line, 2);
+                $headers[$split[0]] = trim($split[1]);
+            }
         }
 
         return $headers;
     }
-
-    private $_headers;
 
     /**
      * Invoke the callback.
@@ -128,6 +125,7 @@ class HttpRequest implements StreamListenerInterface
 
     /**
      * Called when a stream has closed.
+     *
      * @param resource $stream
      * @param $id
      * @return mixed
@@ -173,7 +171,8 @@ class HttpRequest implements StreamListenerInterface
      *
      * @return mixed
      */
-    public function getRequestLine() {
+    public function getRequestLine()
+    {
         return $this->requestLine;
     }
 }
