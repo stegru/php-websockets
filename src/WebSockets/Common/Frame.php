@@ -11,12 +11,17 @@ namespace WebSockets\Common;
  */
 class Frame
 {
+    const OPCODE_TEXT = 0x01;
+    const OPCODE_BINARY = 0x02;
+    const OPCODE_CLOSE = 0x08;
+    const OPCODE_PING = 0x09;
+    const OPCODE_PONG = 0x0A;
     /** @var bool TRUE if it's the final fragment. */
-    private $final = FALSE;
+    private $final = false;
     /** @var int 4-bit opcode */
     private $opcode = self::OPCODE_TEXT;
     /** @var bool TRUE if payload is masked */
-    private $masked = FALSE;
+    private $masked = false;
     /** @var int Payload length */
     private $length;
     /** @var string Masking-key */
@@ -28,21 +33,13 @@ class Frame
     /** @var int Where in the data buffer the payload starts. */
     private $payloadOffset;
     /** @var bool TRUE if the header has been parsed. */
-    private $headerParsed = FALSE;
+    private $headerParsed = false;
     /** @var bool TRUE if all the data has been received. */
-    private $complete = FALSE;
+    private $complete = false;
     /** @var bool TRUE if the frame is from the client. */
-    private $fromClient = TRUE;
+    private $fromClient = true;
     /** @var string Any data after the frame (could be for the next frame) */
     private $extraData;
-
-    const OPCODE_TEXT = 0x01;
-    const OPCODE_BINARY = 0x02;
-
-    const OPCODE_CLOSE = 0x08;
-    const OPCODE_PING = 0x09;
-    const OPCODE_PONG = 0x0A;
-
 
     /**
      * @param $fromClient TRUE if the frame was from the client.
@@ -50,6 +47,18 @@ class Frame
     public function __construct($fromClient)
     {
         $this->fromClient = $fromClient;
+    }
+
+    /**
+     * Creates a text Frame for the client for the given message.
+     *
+     * @param $message string The message.
+     * @param bool $binary TRUE for binary message, otherwise a text message.
+     * @return Frame|Frame[]
+     */
+    public static function FromMessage($message, $binary = false)
+    {
+        return self::ForClient($binary ? self::OPCODE_BINARY : self::OPCODE_TEXT, $message);
     }
 
     /**
@@ -61,23 +70,12 @@ class Frame
      */
     public static function ForClient($opcode, $payload)
     {
-        $frame = new Frame(FALSE);
+        $frame = new Frame(false);
         $frame->opcode = (int)$opcode;
         $frame->payload = $payload;
         $frame->length = strlen($frame->payload);
-        return $frame;
-    }
 
-    /**
-     * Creates a text Frame for the client for the given message.
-     *
-     * @param $message string The message.
-     * @param bool $binary TRUE for binary message, otherwise a text message.
-     * @return Frame|Frame[]
-     */
-    public static function FromMessage($message, $binary = FALSE)
-    {
-        return self::ForClient($binary ? self::OPCODE_BINARY : self::OPCODE_TEXT, $message);
+        return $frame;
     }
 
     /**
@@ -87,7 +85,7 @@ class Frame
      */
     public function getData()
     {
-        if (!$this->fromClient && $this->data === NULL) {
+        if (!$this->fromClient && $this->data === null) {
             $this->data = $this->generateData();
         }
 
@@ -131,7 +129,7 @@ class Frame
 
         if ($this->length < 126) {
             $len = $this->length;
-            $lenBytes = NULL;
+            $lenBytes = null;
         } else {
             $short = ($this->length < 0xFFFF);
 
@@ -150,7 +148,7 @@ class Frame
         // bits 9-15: Payload len
         $data .= chr($len);
 
-        if ($lenBytes !== NULL) {
+        if ($lenBytes !== null) {
             // bits 16+ Extended payload length
             $data .= $lenBytes;
         }
@@ -174,35 +172,39 @@ class Frame
         $this->parseHeader();
 
         if (!$this->headerParsed) {
-            return FALSE;
+            return false;
         }
 
         $expectedLength = $this->payloadOffset + $this->length;
         $actualLength = strlen($this->data);
 
         if ($actualLength < $expectedLength) {
-            return FALSE;
-        } else if ($actualLength > $expectedLength) {
-            // received more data than required (possibly the next frame)
-            $this->extraData = substr($this->data, $expectedLength);
-            $this->data = substr($this->data, 0, $expectedLength);
+            return false;
         } else {
-            $this->extraData = NULL;
+            if ($actualLength > $expectedLength) {
+                // received more data than required (possibly the next frame)
+                $this->extraData = substr($this->data, $expectedLength);
+                $this->data = substr($this->data, 0, $expectedLength);
+            } else {
+                $this->extraData = null;
+            }
         }
 
         $this->gotFullFrame();
-        return TRUE;
+
+        return true;
     }
 
     /**
      * Parse the header.
+     *
      * @return bool TRUE if the header has been parsed. FALSE if there's not enough data.
      * @throws BadFrameException thrown if there is something wrong with the frame.
      */
     private function parseHeader()
     {
         if ($this->headerParsed) {
-            return TRUE;
+            return true;
         }
 
         /* https://tools.ietf.org/html/rfc6455#section-5.2
@@ -229,11 +231,11 @@ class Frame
         $dataLen = strlen($this->data);
 
         if ($dataLen < 2) {
-            return FALSE;
+            return false;
         }
 
         $offset = 0;
-        $head = [ord($this->data[$offset]), ord($this->data[$offset+1])];
+        $head = [ord($this->data[$offset]), ord($this->data[$offset + 1])];
         $offset += 2;
 
         // bit 0: FIN
@@ -265,7 +267,7 @@ class Frame
 
             // Not enough data yet.
             if ($dataLen < $offset + $lenSize) {
-                return FALSE;
+                return false;
             }
 
             $l = unpack($unpackFormat, substr($this->data, $offset, $lenSize));
@@ -284,14 +286,16 @@ class Frame
             // and MUST NOT be fragmented.
             if ($this->length > 125) {
                 throw new BadFrameException("Control frame too long.");
-            } else if (!$this->final) {
-                throw new BadFrameException("Control frame is fragmented.");
+            } else {
+                if (!$this->final) {
+                    throw new BadFrameException("Control frame is fragmented.");
+                }
             }
         }
 
         if ($this->masked) {
             if ($dataLen < $offset + 4) {
-                return FALSE;
+                return false;
             }
 
             $this->maskKey = substr($this->data, $offset, 4);
@@ -303,9 +307,29 @@ class Frame
         }
 
         $this->payloadOffset = $offset;
-        $this->headerParsed = TRUE;
+        $this->headerParsed = true;
 
-        return TRUE;
+        return true;
+    }
+
+    /**
+     * Returns TRUE if this is a control frame. FALSE for a data frame.
+     *
+     * @return bool
+     */
+    public function isControl()
+    {
+        return !$this->isData();
+    }
+
+    /**
+     * Returns TRUE if this is a data frame. FALSE for a control frame.
+     *
+     * @return int
+     */
+    public function isData()
+    {
+        return $this->opcode & 0x0 === 0x00;
     }
 
     private function gotFullFrame()
@@ -315,9 +339,9 @@ class Frame
 
         if ($this->masked) {
             $this->mask();
-            $this->masked = FALSE;
+            $this->masked = false;
         }
-        $this->complete = TRUE;
+        $this->complete = true;
     }
 
     /**
@@ -331,8 +355,6 @@ class Frame
             $this->payload[$n] = $this->payload[$n] ^ $this->maskKey[$n % 4];
         }
     }
-
-
 
     /**
      * Returns TRUE if the full frame has been received.
@@ -395,26 +417,6 @@ class Frame
     }
 
     /**
-     * Returns TRUE if this is a data frame. FALSE for a control frame.
-     *
-     * @return int
-     */
-    public function isData()
-    {
-        return $this->opcode & 0x0 === 0x00;
-    }
-
-    /**
-     * Returns TRUE if this is a control frame. FALSE for a data frame.
-     *
-     * @return bool
-     */
-    public function isControl()
-    {
-        return !$this->isData();
-    }
-
-    /**
      * Gets any extra data after this frame.
      *
      * @return string|NULL
@@ -423,6 +425,4 @@ class Frame
     {
         return $this->extraData;
     }
-
-
 }

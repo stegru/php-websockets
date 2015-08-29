@@ -1,6 +1,7 @@
 <?php
 
 namespace WebSockets\Common;
+
 use WebSockets\Server\WebSocketRequest;
 
 /**
@@ -17,10 +18,9 @@ use WebSockets\Server\WebSocketRequest;
  */
 class Event
 {
-    /** @var bool  */
-    private $sent = FALSE;
-    private $readonly = FALSE;
-
+    /** @var bool */
+    private $sent = false;
+    private $readonly = false;
     /** @var array Properties of this object. */
     private $properties = [];
 
@@ -36,7 +36,6 @@ class Event
         $this->producer = $producer;
     }
 
-
     /**
      * is utilized for reading data from inaccessible members.
      *
@@ -46,7 +45,7 @@ class Event
      */
     function __get($name)
     {
-        return $this->__isset($name) ? $this->properties[$name] : NULL;
+        return $this->__isset($name) ? $this->properties[$name] : null;
     }
 
     /**
@@ -73,7 +72,7 @@ class Event
      */
     function __isset($name)
     {
-        return array_key_exists($name, $this->properties) && $this->properties[$name] != NULL;
+        return array_key_exists($name, $this->properties) && $this->properties[$name] != null;
     }
 
     /**
@@ -95,7 +94,7 @@ class Event
      */
     public function setSent()
     {
-        $this->readonly = $this->sent = TRUE;
+        $this->readonly = $this->sent = true;
     }
 }
 

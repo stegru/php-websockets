@@ -1,6 +1,7 @@
 <?php
 
 namespace WebSockets\Common;
+
 use WebSockets\Server\WebSocketServer;
 
 
@@ -12,21 +13,15 @@ use WebSockets\Server\WebSocketServer;
 abstract class Connection
 {
     use EventDispatcherTrait;
-
     /** @var resource */
     private $stream;
-
     /** @var Frame */
     private $currentFrame;
-
     /** @var bool TRUE if the connect has been closed. */
-    private $closed = FALSE;
-
+    private $closed = false;
     /** @var string The current message. */
     private $message = "";
-
     private $id;
-
 
     /**
      * @param resource $stream
@@ -45,8 +40,8 @@ abstract class Connection
      */
     public function gotData($data)
     {
-        if ($this->currentFrame === NULL) {
-            $this->currentFrame = new Frame(TRUE);
+        if ($this->currentFrame === null) {
+            $this->currentFrame = new Frame(true);
         }
 
         try {
@@ -63,11 +58,19 @@ abstract class Connection
         $this->gotFrame($this->currentFrame);
 
         $extra = $this->currentFrame->getExtraData();
-        $this->currentFrame = NULL;
+        $this->currentFrame = null;
 
-        if ($extra !== NULL) {
+        if ($extra !== null) {
             $this->gotData($extra);
         }
+    }
+
+    /**
+     * Closes the connection.
+     */
+    private function closeConnection()
+    {
+        fclose($this->stream);
     }
 
     /**
@@ -88,27 +91,26 @@ abstract class Connection
 
                 case Frame::OPCODE_PONG:
                     break;
-
             }
         } else {
 
             $this->message .= $frame->getPayload();
             if ($frame->isFinal()) {
                 $this->gotMessage();
-                $this->message = NULL;
+                $this->message = null;
             }
         }
     }
 
     /**
-     * Send some data to the remote end point.
-     *
-     * @param string $data The data to send.
-     * @return int
+     * Called when a complete message has been received.
      */
-    public function sendData($data)
+    private function gotMessage()
     {
-        return fwrite($this->stream, $data);
+        $e = $this->createEvent(WebSocketServer::EVENT_MESSAGE);
+        $e->connection = $this;
+        $e->message = $this->message;
+        $this->notifyEventListeners($e);
     }
 
     /**
@@ -132,25 +134,25 @@ abstract class Connection
     }
 
     /**
-     * Called when a complete message has been received.
-     */
-    private function gotMessage()
-    {
-        $e = $this->createEvent(WebSocketServer::EVENT_MESSAGE);
-        $e->connection = $this;
-        $e->message = $this->message;
-        $this->notifyEventListeners($e);
-    }
-
-    /**
      * Send a message to the remote end point.
      *
      * @param $message
      * @param bool $binary TRUE for a binary message, FALSE for text message.
      */
-    public function sendMessage($message, $binary = FALSE)
+    public function sendMessage($message, $binary = false)
     {
         $this->sendData(Frame::FromMessage($message, $binary)->getData());
+    }
+
+    /**
+     * Send some data to the remote end point.
+     *
+     * @param string $data The data to send.
+     * @return int
+     */
+    public function sendData($data)
+    {
+        return fwrite($this->stream, $data);
     }
 
     /**
@@ -172,13 +174,4 @@ abstract class Connection
     {
         return $this->currentFrame;
     }
-
-    /**
-     * Closes the connection.
-     */
-    private function closeConnection()
-    {
-        fclose($this->stream);
-    }
-
 }

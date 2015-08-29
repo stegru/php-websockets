@@ -14,7 +14,6 @@ class HttpRequest implements StreamListenerInterface
 {
     /** @var string The current buffer containing the request. */
     private $requestBuffer = '';
-
     /** @var callable The callback to invoke when all of the headers have been received. */
     private $callback;
     /** @var resource The socket stream from which the request is read. */
@@ -35,6 +34,7 @@ class HttpRequest implements StreamListenerInterface
         $req = new HttpRequest();
         $req->stream = $stream;
         $req->callback = $callback;
+
         return $req;
     }
 
@@ -49,6 +49,7 @@ class HttpRequest implements StreamListenerInterface
         $req = new HttpRequest();
         $req->requestBuffer = $requestBuffer;
         $req->gotHeaders();
+
         return $req;
     }
 
@@ -58,7 +59,7 @@ class HttpRequest implements StreamListenerInterface
     private function gotHeaders()
     {
         $this->headers = $this->parseHeaders();
-        $this->callCallback(TRUE);
+        $this->callCallback(true);
     }
 
     /**
@@ -68,7 +69,7 @@ class HttpRequest implements StreamListenerInterface
      */
     private function parseHeaders()
     {
-        $lines = preg_split("/\r?\n/", $this->requestBuffer, NULL, PREG_SPLIT_NO_EMPTY);
+        $lines = preg_split("/\r?\n/", $this->requestBuffer, null, PREG_SPLIT_NO_EMPTY);
         $this->requestLine = array_shift($lines);
 
         $headers = [];
@@ -105,7 +106,7 @@ class HttpRequest implements StreamListenerInterface
     public function streamReady($stream, $id)
     {
         $data = fread($stream, 0x400);
-        if ($data === FALSE) {
+        if ($data === false) {
             return;
         }
 
@@ -118,7 +119,7 @@ class HttpRequest implements StreamListenerInterface
         $this->requestBuffer .= $data;
         $end = strpos($this->requestBuffer, "\r\n\r\n", $len);
 
-        if ($end !== FALSE) {
+        if ($end !== false) {
             $this->gotHeaders();
         }
     }
@@ -132,7 +133,7 @@ class HttpRequest implements StreamListenerInterface
      */
     public function streamClosed($stream, $id)
     {
-        $this->callCallback(FALSE);
+        $this->callCallback(false);
     }
 
     /**
@@ -153,7 +154,7 @@ class HttpRequest implements StreamListenerInterface
      */
     public function getHeader($name)
     {
-        return array_key_exists($name, $this->headers) ? $this->headers[$name] : NULL;
+        return array_key_exists($name, $this->headers) ? $this->headers[$name] : null;
     }
 
     /**

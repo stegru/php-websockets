@@ -29,8 +29,8 @@ trait EventDispatcherTrait
      */
     public function removeEventListener($listener)
     {
-        $key = array_search($listener, $this->eventListeners, FALSE);
-        if ($key !== FALSE) {
+        $key = array_search($listener, $this->eventListeners, false);
+        if ($key !== false) {
             unset($this->eventListeners[$key]);
         }
     }
@@ -46,8 +46,10 @@ trait EventDispatcherTrait
         foreach ($this->eventListeners as $listener) {
             if ($listener instanceof EventListenerInterface) {
                 $listener->gotEvent($event);
-            } else if (is_callable($listener)) {
-                $listener($event);
+            } else {
+                if (is_callable($listener)) {
+                    $listener($event);
+                }
             }
         }
     }
@@ -58,9 +60,10 @@ trait EventDispatcherTrait
      * @param null $eventId
      * @return Event A new event.
      */
-    protected function createEvent($eventId = NULL)
+    protected function createEvent($eventId = null)
     {
         $event = new Event($this, $eventId);
+
         return $event;
     }
 }

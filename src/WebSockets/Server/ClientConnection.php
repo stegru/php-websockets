@@ -1,6 +1,7 @@
 <?php
 
 namespace WebSockets\Server;
+
 use WebSockets\Common\Connection;
 
 /**

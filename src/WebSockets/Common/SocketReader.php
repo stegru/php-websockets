@@ -3,6 +3,7 @@ namespace WebSockets\Common;
 
 /**
  * Listens on multiple streams.
+ *
  * @package WebSockets\Server
  */
 class SocketReader
@@ -19,13 +20,40 @@ class SocketReader
     /**
      * @param StreamListenerInterface $defaultListener
      */
-    public function __construct($defaultListener = NULL)
+    public function __construct($defaultListener = null)
     {
         $this->defaultListener = $defaultListener;
     }
 
     /**
+     * Add a stream.
+     *
+     * @param resource $stream
+     * @param mixed $id
+     * @param StreamListenerInterface $eventListener
+     * @return int|mixed
+     */
+    public function addStream($stream, $id = null, StreamListenerInterface $eventListener = null)
+    {
+        if ($this->idExists($id)) {
+            $id = null;
+        }
+
+        if ($id === null) {
+            $id = $this->generateId();
+        }
+
+        $this->streams[$id] = $stream;
+        if ($eventListener !== null) {
+            $this->listeners[$id] = $eventListener;
+        }
+
+        return $id;
+    }
+
+    /**
      * Checks if a stream with the given ID exists.
+     *
      * @param $id string The ID to check
      * @return bool TRUE if there's a stream with the given ID.
      */
@@ -41,47 +69,71 @@ class SocketReader
      */
     private function generateId()
     {
-        while ($this->idExists(++$this->lastId));
+        while ($this->idExists(++$this->lastId)) {
+            ;
+        }
+
         return $this->lastId;
     }
 
     /**
-     * Add a stream.
+     * Gets a stream.
      *
-     * @param resource $stream
-     * @param mixed $id
-     * @param StreamListenerInterface $eventListener
-     * @return int|mixed
+     * @param string $id
+     * @return resource NULL if no such ID.
      */
-    public function addStream($stream, $id = NULL, StreamListenerInterface $eventListener = NULL)
+    public function getStream($id)
     {
-        if ($this->idExists($id)) {
-            $id = NULL;
-        }
-
-        if ($id === NULL) {
-            $id = $this->generateId();
-        }
-
-        $this->streams[$id] = $stream;
-        if ($eventListener !== NULL) {
-            $this->listeners[$id] = $eventListener;
-        }
-
-        return $id;
+        return $this->idExists($id) ? $this->streams[$id] : null;
     }
 
     /**
-     * Removes a stream.
+     * Listens on the streams, invoking the stream listeners accordingly.
+     * Returns upon timeout, error, or no streams.
      *
-     * @param $id
+     * @param int $timeout Number of seconds to wait for something. NULL to wait forever.
+     * @return bool TRUE on timeout, FALSE on error.
      */
-    public function removeStream($id)
+    public function listen($timeout = 10)
     {
-        $id = $this->getId($id);
-        if ($id !== FALSE) {
-            unset($this->streams[$id], $this->listeners[$id]);
+        while (count($this->streams) > 0) {
+            $read = array_merge([], $this->streams);
+            $write = null;
+            $except = null;
+
+            $changed = stream_select($read, $write, $except, $timeout);
+
+            if ($changed === false) {
+                echo("oops\n");
+
+                return false;
+            } else {
+                if ($changed === 0) {
+                    echo("timed out");
+
+                    return true;
+                }
+            }
+
+            foreach ($read as $stream) {
+
+                $id = $this->getId($stream);
+                $listener = $this->getListener($id);
+
+                if ($listener !== null) {
+                    // Invoke the listener.
+                    if (feof($stream)) {
+                        fclose($stream);
+                        $listener->streamClosed($stream, $id);
+                        $this->removeStream($id);
+                    } else {
+                        $listener->streamReady($stream, $id);
+                    }
+                }
+            }
         }
+
+        return false;
     }
 
     /**
@@ -93,24 +145,15 @@ class SocketReader
     public function getId($obj)
     {
         if ($obj instanceof StreamListenerInterface) {
-            return array_search($obj, $this->listeners, TRUE);
-        } else if (is_resource($obj)) {
-            return array_search($obj, $this->streams, TRUE);
+            return array_search($obj, $this->listeners, true);
+        } else {
+            if (is_resource($obj)) {
+                return array_search($obj, $this->streams, true);
+            }
         }
 
         // See if it's an ID.
-        return $this->idExists($obj) ? $obj : FALSE;
-    }
-
-    /**
-     * Gets a stream.
-     *
-     * @param string $id
-     * @return resource NULL if no such ID.
-     */
-    public function getStream($id)
-    {
-        return $this->idExists($id) ? $this->streams[$id] : NULL;
+        return $this->idExists($obj) ? $obj : false;
     }
 
     /**
@@ -125,47 +168,15 @@ class SocketReader
     }
 
     /**
-     * Listens on the streams, invoking the stream listeners accordingly.
-     * Returns upon timeout, error, or no streams.
+     * Removes a stream.
      *
-     * @param int $timeout Number of seconds to wait for something. NULL to wait forever.
-     * @return bool TRUE on timeout, FALSE on error.
+     * @param $id
      */
-    public function listen($timeout = 10)
+    public function removeStream($id)
     {
-        while (count($this->streams) > 0) {
-            $read = array_merge([], $this->streams);
-            $write = NULL;
-            $except = NULL;
-
-            $changed = stream_select($read, $write, $except, $timeout);
-
-            if ($changed === FALSE) {
-                echo("oops\n");
-                return FALSE;
-            } else if ($changed === 0) {
-                echo("timed out");
-                return TRUE;
-            }
-
-            foreach ($read as $stream) {
-
-                $id = $this->getId($stream);
-                $listener = $this->getListener($id);
-
-                if ($listener !== NULL) {
-                    // Invoke the listener.
-                    if (feof($stream)) {
-                        fclose($stream);
-                        $listener->streamClosed($stream, $id);
-                        $this->removeStream($id);
-                    } else {
-                        $listener->streamReady($stream, $id);
-                    }
-                }
-            }
+        $id = $this->getId($id);
+        if ($id !== false) {
+            unset($this->streams[$id], $this->listeners[$id]);
         }
-
-        return FALSE;
     }
 }

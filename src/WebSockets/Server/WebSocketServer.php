@@ -1,10 +1,11 @@
 <?php
 
 namespace WebSockets\Server;
+
 use WebSockets\Common\Event;
-use WebSockets\Common\Frame;
 use WebSockets\Common\EventDispatcherTrait;
 use WebSockets\Common\EventListenerInterface;
+use WebSockets\Common\Frame;
 use WebSockets\Common\SocketReader;
 use WebSockets\Common\StreamListenerInterface;
 
@@ -18,12 +19,10 @@ use WebSockets\Common\StreamListenerInterface;
 class WebSocketServer implements StreamListenerInterface, EventListenerInterface
 {
     use EventDispatcherTrait;
-
     const EVENT_MESSAGE = 'message';
     const EVENT_HANDSHAKE = 'handshake';
     const EVENT_CONNECTED = 'connected';
     const EVENT_DISCONNECTED = 'disconnected';
-
     /** @var SocketReader */
     private $streams;
     /** @var ClientConnection[] */
@@ -52,20 +51,11 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
     {
         $this->createListener();
 
-        while ($this->pump(NULL) === TRUE);
+        while ($this->pump(null) === true) {
+            ;
+        }
 
-        return FALSE;
-    }
-
-    /**
-     * Pumps any pending data.
-     *
-     * @param int $timeout Number of seconds to wait for something. NULL to wait forever.
-     * @return bool TRUE on timeout, FALSE on error.
-     */
-    public function pump($timeout = 30)
-    {
-        return $this->streams->listen($timeout);
+        return false;
     }
 
     /**
@@ -78,19 +68,14 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
     }
 
     /**
-     * Accepts a new connection.
+     * Pumps any pending data.
      *
-     * @param resource $listenerStream The socket created by stream_socket_server
+     * @param int $timeout Number of seconds to wait for something. NULL to wait forever.
+     * @return bool TRUE on timeout, FALSE on error.
      */
-    private function newConnection($listenerStream)
+    public function pump($timeout = 30)
     {
-        $stream = stream_socket_accept($listenerStream);
-
-        // The first bit of data from the client should be a HTTP request.
-        $req = HttpRequest::FromStream($stream, [$this, 'gotHeaders']);
-
-        // Send the stream to the HTTP request handler.
-        $this->streams->addStream($stream, NULL, $req);
+        return $this->streams->listen($timeout);
     }
 
     /**
@@ -113,6 +98,7 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
 
         if (!$success) {
             fclose($stream);
+
             return;
         }
 
@@ -155,14 +141,13 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
     }
 
     /**
-     * Gets a connection.
+     * Sends a message to every client.
      *
-     * @param string $id The ID of the connection.
-     * @return null|ClientConnection
+     * @param $message
      */
-    private function getConnection($id)
+    public function broadcastMessage($message)
     {
-        return isset($this->connections[$id]) ? $this->connections[$id] : NULL;
+        $this->broadcastData(Frame::FromMessage($message)->getData());
     }
 
     /**
@@ -178,16 +163,6 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
     }
 
     /**
-     * Sends a message to every client.
-     *
-     * @param $message
-     */
-    public function broadcastMessage($message)
-    {
-        $this->broadcastData(Frame::FromMessage($message)->getData());
-    }
-
-    /**
      * Called when a stream is ready for reading.
      *
      * @param resource $stream
@@ -198,6 +173,7 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
     {
         if ($id === 'listener') {
             $this->newConnection($stream);
+
             return;
         }
 
@@ -205,6 +181,33 @@ class WebSocketServer implements StreamListenerInterface, EventListenerInterface
 
         $connection = $this->getConnection($id);
         $connection->gotData($buf);
+    }
+
+    /**
+     * Accepts a new connection.
+     *
+     * @param resource $listenerStream The socket created by stream_socket_server
+     */
+    private function newConnection($listenerStream)
+    {
+        $stream = stream_socket_accept($listenerStream);
+
+        // The first bit of data from the client should be a HTTP request.
+        $req = HttpRequest::FromStream($stream, [$this, 'gotHeaders']);
+
+        // Send the stream to the HTTP request handler.
+        $this->streams->addStream($stream, null, $req);
+    }
+
+    /**
+     * Gets a connection.
+     *
+     * @param string $id The ID of the connection.
+     * @return null|ClientConnection
+     */
+    private function getConnection($id)
+    {
+        return isset($this->connections[$id]) ? $this->connections[$id] : null;
     }
 
     /**

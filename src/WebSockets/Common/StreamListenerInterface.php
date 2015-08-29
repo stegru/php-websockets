@@ -21,6 +21,7 @@ interface StreamListenerInterface
 
     /**
      * Called when a stream has closed.
+     *
      * @param resource $stream
      * @param $id
      * @return mixed

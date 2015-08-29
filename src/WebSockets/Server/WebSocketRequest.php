@@ -18,14 +18,15 @@ class WebSocketRequest
     private $key;
     /** @var string[] */
     private $protocols;
-    private $rejected = FALSE;
+    private $rejected = false;
 
     /**
      * WebSocketRequest constructor.
+     *
      * @param HttpRequest $httpRequest The HTTP request.
      * @param HttpResponse $httpResponse The HTTP response. NULL to create a new one.
      */
-    public function __construct(HttpRequest $httpRequest, HttpResponse $httpResponse = NULL)
+    public function __construct(HttpRequest $httpRequest, HttpResponse $httpResponse = null)
     {
         $this->httpRequest = $httpRequest;
         $this->httpResponse = $httpResponse ?: new HttpResponse();
@@ -33,6 +34,7 @@ class WebSocketRequest
 
     /**
      * Read and validate the request.
+     *
      * @return bool TRUE if valid.
      */
     public function validate()
@@ -41,30 +43,46 @@ class WebSocketRequest
 
         if (preg_match(',^GET /[^ ]* HTTP/1.1$,', $requestLine) !== 1) {
             $this->httpResponse->setStatus("400 Bad Request");
-
-        } else if (stristr($this->httpRequest->getHeader("Upgrade"), "websocket") === FALSE) {
-            $this->reject("400 Unrecognised Upgrade header");
-
-        } else if (stristr($this->httpRequest->getHeader("Connection"), "Upgrade") === FALSE) {
-            $this->reject("400 Unrecognised Connection header");
-
-        } else if ($this->httpRequest->getHeader("Sec-WebSocket-Version") !== "13") {
-            $this->reject("400 Unrecognised Sec-WebSocket-Version header");
-
-        } else if (($this->key = $this->httpRequest->getHeader("Sec-WebSocket-Key")) === NULL) {
-            $this->reject("400 Unrecognised Sec-WebSocket-Key");
-
-        } else if (($protocols = $this->httpRequest->getHeader("Sec-WebSocket-Protocol")) === NULL) {
-            $this->reject("400 Unrecognised Sec-WebSocket-Protocol");
-
         } else {
-            $this->protocols = explode(',', $protocols);
-            $this->protocol = $this->protocols[0];
-            $this->httpResponse->setStatus("101 Switching Protocols");
-            return TRUE;
+            if (stristr($this->httpRequest->getHeader("Upgrade"), "websocket") === false) {
+                $this->reject("400 Unrecognised Upgrade header");
+            } else {
+                if (stristr($this->httpRequest->getHeader("Connection"), "Upgrade") === false) {
+                    $this->reject("400 Unrecognised Connection header");
+                } else {
+                    if ($this->httpRequest->getHeader("Sec-WebSocket-Version") !== "13") {
+                        $this->reject("400 Unrecognised Sec-WebSocket-Version header");
+                    } else {
+                        if (($this->key = $this->httpRequest->getHeader("Sec-WebSocket-Key")) === null) {
+                            $this->reject("400 Unrecognised Sec-WebSocket-Key");
+                        } else {
+                            if (($protocols = $this->httpRequest->getHeader("Sec-WebSocket-Protocol")) === null) {
+                                $this->reject("400 Unrecognised Sec-WebSocket-Protocol");
+                            } else {
+                                $this->protocols = explode(',', $protocols);
+                                $this->protocol = $this->protocols[0];
+                                $this->httpResponse->setStatus("101 Switching Protocols");
+
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        return FALSE;
+        return false;
+    }
+
+    /**
+     * Rejects the request.
+     *
+     * @param string $message
+     * @param int $httpResponseCode
+     */
+    public function reject($message = "Rejected", $httpResponseCode = 400)
+    {
+        $this->httpResponse->setStatus($httpResponseCode . ' ' . $message);
     }
 
     public function handshake()
@@ -78,17 +96,6 @@ class WebSocketRequest
             "Sec-WebSocket-Accept" => $hash,
             "Sec-WebSocket-Protocol" => $this->protocol
         ]);
-    }
-
-    /**
-     * Rejects the request.
-     *
-     * @param string $message
-     * @param int $httpResponseCode
-     */
-    public function reject($message = "Rejected", $httpResponseCode = 400)
-    {
-        $this->httpResponse->setStatus($httpResponseCode . ' ' . $message);
     }
 
     /**
@@ -150,6 +157,4 @@ class WebSocketRequest
     {
         return $this->rejected;
     }
-
-
 }
